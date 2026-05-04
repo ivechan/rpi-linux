@@ -109,6 +109,7 @@ static inline pteval_t __phys_to_pte_val(phys_addr_t phys)
 #define pte_user_exec(pte)	(!(pte_val(pte) & PTE_UXN))
 #define pte_cont(pte)		(!!(pte_val(pte) & PTE_CONT))
 #define pte_devmap(pte)		(!!(pte_val(pte) & PTE_DEVMAP))
+#define pte_soft_dirty(pte)	(!!(pte_val(pte) & PTE_SOFT_DIRTY))
 #define pte_tagged(pte)		((pte_val(pte) & PTE_ATTRINDX_MASK) == \
 				 PTE_ATTRINDX(MT_NORMAL_TAGGED))
 
@@ -225,7 +226,7 @@ static inline pte_t pte_mkclean(pte_t pte)
 	return pte;
 }
 
-static inline pte_t pte_mkdirty(pte_t pte)
+static inline pte_t __pte_mkdirty(pte_t pte)
 {
 	pte = set_pte_bit(pte, __pgprot(PTE_DIRTY));
 
@@ -233,6 +234,11 @@ static inline pte_t pte_mkdirty(pte_t pte)
 		pte = clear_pte_bit(pte, __pgprot(PTE_RDONLY));
 
 	return pte;
+}
+
+static inline pte_t pte_mkdirty(pte_t pte)
+{
+	return __pte_mkdirty(set_pte_bit(pte, __pgprot(PTE_SOFT_DIRTY)));
 }
 
 static inline pte_t pte_wrprotect(pte_t pte)
@@ -313,6 +319,16 @@ static inline pte_t pte_clear_uffd_wp(pte_t pte)
 	return clear_pte_bit(pte, __pgprot(PTE_UFFD_WP));
 }
 #endif /* CONFIG_HAVE_ARCH_USERFAULTFD_WP */
+
+static inline pte_t pte_mksoft_dirty(pte_t pte)
+{
+	return set_pte_bit(pte, __pgprot(PTE_SOFT_DIRTY));
+}
+
+static inline pte_t pte_clear_soft_dirty(pte_t pte)
+{
+	return clear_pte_bit(pte, __pgprot(PTE_SOFT_DIRTY));
+}
 
 static inline void __set_pte_nosync(pte_t *ptep, pte_t pte)
 {
@@ -530,6 +546,21 @@ static inline pte_t pte_swp_clear_uffd_wp(pte_t pte)
 }
 #endif /* CONFIG_HAVE_ARCH_USERFAULTFD_WP */
 
+static inline pte_t pte_swp_mksoft_dirty(pte_t pte)
+{
+	return set_pte_bit(pte, __pgprot(PTE_SWP_SOFT_DIRTY));
+}
+
+static inline bool pte_swp_soft_dirty(pte_t pte)
+{
+	return !!(pte_val(pte) & PTE_SWP_SOFT_DIRTY);
+}
+
+static inline pte_t pte_swp_clear_soft_dirty(pte_t pte)
+{
+	return clear_pte_bit(pte, __pgprot(PTE_SWP_SOFT_DIRTY));
+}
+
 #ifdef CONFIG_NUMA_BALANCING
 /*
  * See the comment in include/linux/pgtable.h
@@ -577,6 +608,23 @@ static inline int pmd_protnone(pmd_t pmd)
 #define pmd_swp_clear_uffd_wp(pmd) \
 				pte_pmd(pte_swp_clear_uffd_wp(pmd_pte(pmd)))
 #endif /* CONFIG_HAVE_ARCH_USERFAULTFD_WP */
+
+#define pmd_soft_dirty(pmd)	pte_soft_dirty(pmd_pte(pmd))
+#define pmd_mksoft_dirty(pmd)	pte_pmd(pte_mksoft_dirty(pmd_pte(pmd)))
+#define pmd_clear_soft_dirty(pmd) \
+				pte_pmd(pte_clear_soft_dirty(pmd_pte(pmd)))
+static inline int pmd_swp_soft_dirty(pmd_t pmd)
+{
+	return pte_swp_soft_dirty(pmd_pte(pmd));
+}
+static inline pmd_t pmd_swp_mksoft_dirty(pmd_t pmd)
+{
+	return pte_pmd(pte_swp_mksoft_dirty(pmd_pte(pmd)));
+}
+static inline pmd_t pmd_swp_clear_soft_dirty(pmd_t pmd)
+{
+	return pte_pmd(pte_swp_clear_soft_dirty(pmd_pte(pmd)));
+}
 
 #define pmd_write(pmd)		pte_write(pmd_pte(pmd))
 
@@ -1170,7 +1218,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	 * dirtiness again.
 	 */
 	if (pte_sw_dirty(pte))
-		pte = pte_mkdirty(pte);
+		pte = __pte_mkdirty(pte);
 	return pte;
 }
 
@@ -1305,7 +1353,7 @@ static inline pte_t __get_and_clear_full_ptes(struct mm_struct *mm,
 		addr += PAGE_SIZE;
 		tmp_pte = __ptep_get_and_clear(mm, addr, ptep);
 		if (pte_dirty(tmp_pte))
-			pte = pte_mkdirty(pte);
+			pte = __pte_mkdirty(pte);
 		if (pte_young(tmp_pte))
 			pte = pte_mkyoung(pte);
 	}
@@ -1422,13 +1470,14 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
  *	bit  3:		remember uffd-wp state
  *	bits 6-10:	swap type
  *	bit  11:	PTE_PRESENT_INVALID (must be zero)
- *	bits 12-61:	swap offset
+ *	bit  61:	remember soft-dirty state
+ *	bits 12-60:	swap offset
  */
 #define __SWP_TYPE_SHIFT	6
 #define __SWP_TYPE_BITS		5
 #define __SWP_TYPE_MASK		((1 << __SWP_TYPE_BITS) - 1)
 #define __SWP_OFFSET_SHIFT	12
-#define __SWP_OFFSET_BITS	50
+#define __SWP_OFFSET_BITS	49
 #define __SWP_OFFSET_MASK	((1UL << __SWP_OFFSET_BITS) - 1)
 
 #define __swp_type(x)		(((x).val >> __SWP_TYPE_SHIFT) & __SWP_TYPE_MASK)

@@ -62,7 +62,7 @@ static void contpte_convert(struct mm_struct *mm, unsigned long addr,
 		pte_t ptent = __ptep_get_and_clear(mm, addr, ptep);
 
 		if (pte_dirty(ptent))
-			pte = pte_mkdirty(pte);
+			pte = __pte_mkdirty(pte);
 
 		if (pte_young(ptent))
 			pte = pte_mkyoung(pte);
@@ -170,7 +170,7 @@ pte_t contpte_ptep_get(pte_t *ptep, pte_t orig_pte)
 		pte = __ptep_get(ptep);
 
 		if (pte_dirty(pte))
-			orig_pte = pte_mkdirty(orig_pte);
+			orig_pte = __pte_mkdirty(orig_pte);
 
 		if (pte_young(pte))
 			orig_pte = pte_mkyoung(orig_pte);
@@ -227,7 +227,7 @@ retry:
 			goto retry;
 
 		if (pte_dirty(pte))
-			orig_pte = pte_mkdirty(orig_pte);
+			orig_pte = __pte_mkdirty(orig_pte);
 
 		if (pte_young(pte))
 			orig_pte = pte_mkyoung(orig_pte);

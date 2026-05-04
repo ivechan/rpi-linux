@@ -134,7 +134,7 @@ pte_t huge_ptep_get(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 		pte_t pte = __ptep_get(ptep);
 
 		if (pte_dirty(pte))
-			orig_pte = pte_mkdirty(orig_pte);
+			orig_pte = __pte_mkdirty(orig_pte);
 
 		if (pte_young(pte))
 			orig_pte = pte_mkyoung(orig_pte);
@@ -167,7 +167,7 @@ static pte_t get_clear_contig(struct mm_struct *mm,
 		tmp_pte = __ptep_get_and_clear(mm, addr, ptep);
 		if (present) {
 			if (pte_dirty(tmp_pte))
-				pte = pte_mkdirty(pte);
+				pte = __pte_mkdirty(pte);
 			if (pte_young(tmp_pte))
 				pte = pte_mkyoung(pte);
 		}
@@ -440,7 +440,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
 
 	/* Make sure we don't lose the dirty or young state */
 	if (pte_dirty(orig_pte))
-		pte = pte_mkdirty(pte);
+		pte = __pte_mkdirty(pte);
 
 	if (pte_young(orig_pte))
 		pte = pte_mkyoung(pte);

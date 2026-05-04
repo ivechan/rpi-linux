@@ -221,7 +221,7 @@ int __ptep_set_access_flags(struct vm_area_struct *vma,
 		return 0;
 
 	/* only preserve the access flags and write permission */
-	pte_val(entry) &= PTE_RDONLY | PTE_AF | PTE_WRITE | PTE_DIRTY;
+	pte_val(entry) &= PTE_RDONLY | PTE_AF | PTE_WRITE | PTE_DIRTY | PTE_SOFT_DIRTY;
 
 	/*
 	 * Setting the flags must be done atomically to avoid racing with the

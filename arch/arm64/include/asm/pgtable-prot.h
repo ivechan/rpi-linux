@@ -34,6 +34,14 @@
 #define PTE_SWP_UFFD_WP		(_AT(pteval_t, 0))
 #endif /* CONFIG_HAVE_ARCH_USERFAULTFD_WP */
 
+#ifdef CONFIG_MEM_SOFT_DIRTY
+#define PTE_SOFT_DIRTY		(_AT(pteval_t, 1) << 63) /* soft-dirty tracking */
+#define PTE_SWP_SOFT_DIRTY	(_AT(pteval_t, 1) << 61) /* only for swp ptes */
+#else
+#define PTE_SOFT_DIRTY		(_AT(pteval_t, 0))
+#define PTE_SWP_SOFT_DIRTY	(_AT(pteval_t, 0))
+#endif /* CONFIG_MEM_SOFT_DIRTY */
+
 #define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
 #define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
 
